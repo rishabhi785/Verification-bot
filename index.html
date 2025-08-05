@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+    <title>Device Verification</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3/dist/fp.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            text-align: center;
+            overflow-x: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 400px;
+            padding: 20px;
+        }
+
+        .screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 80vh;
+            width: 100%;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Loading Screen Styles */
+        .loader-container {
+            width: 120px;
+            height: 120px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .device-loader {
+            position: relative;
+            width: 80px;
+            height: 80px;
+        }
+
+        .device-circle {
+            width: 80px;
+            height: 80px;
+            border: 3px solid rgba(255, 255, 255, 0.2);
+            border-top: 3px solid #4fc3f7;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .device-inner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(45deg, #4fc3f7, #29b6f6);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .scan-line {
+            width: 60%;
+            height: 2px;
+            background: #fff;
+            animation: scanning 2s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes scanning {
+            0%, 100% { opacity: 0.3; transform: scaleX(0.5); }
+            50% { opacity: 1; transform: scaleX(1); }
+        }
+
+        h1 {
+            font-size: 28px;
+            margin: 20px 0 10px;
+            font-weight: 600;
+        }
+
+        .progress-bar {
+            width: 300px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 20px auto;
+        }
+
+        .progress {
+            height: 100%;
+            width: 0;
+            background: linear-gradient(90deg, #4fc3f7, #29b6f6);
+            animation: progressAnimation 3s ease-out forwards;
+        }
+
+        @keyframes progressAnimation {
+            0% { width: 0%; }
+            100% { width: 100%; }
+        }
+
+        .message {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 16px;
+            margin: 10px 0;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+
+        /* Success/Error Screen Styles */
+        .status-icon {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 30px;
+            position: relative;
+            animation: scaleIn 0.6s ease-out;
+        }
+
+        @keyframes scaleIn {
+            0% { transform: scale(0); opacity: 0; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .success-icon {
+            background: linear-gradient(135deg, #4caf50, #66bb6a);
+        }
+
+        .error-icon {
+            background: linear-gradient(135deg, #f44336, #ef5350);
+        }
+
+        .already-verified-icon {
+            background: linear-gradient(135deg, #2196f3, #42a5f5);
+        }
+
+        .status-icon svg {
+            width: 50px;
+            height: 50px;
+            color: white;
+        }
+
+        .status-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .status-message {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.5;
+            margin-bottom: 30px;
+            max-width: 300px;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 14px 30px;
+            background: linear-gradient(135deg, #4fc3f7, #29b6f6);
+            color: #fff;
+            text-decoration: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(79, 195, 247, 0.4);
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(79, 195, 247, 0.6);
+        }
+
+        .button-error {
+            background: linear-gradient(135deg, #f44336, #ef5350);
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.4);
+        }
+
+        .button-error:hover {
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.6);
+        }
+
+        .button-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            margin-top: 10px;
+            box-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
+        }
+
+        .button-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 6px 20px rgba(255, 255, 255, 0.2);
+        }
+
+        .loading-dots {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background: #4fc3f7;
+            border-radius: 50%;
+            margin: 0 4px;
+            animation: loadingDots 1.4s ease-in-out infinite both;
+        }
+
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes loadingDots {
+            0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 480px) {
+            .container { padding: 15px; }
+            h1 { font-size: 24px; }
+            .progress-bar { width: 250px; }
+            .status-icon { width: 80px; height: 80px; }
+            .status-icon svg { width: 40px; height: 40px; }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Loading Screen -->
+    <div class="screen loading-screen active">
+        <div class="container">
+            <div class="loader-container">
+                <div class="device-loader">
+                    <div class="device-circle"></div>
+                    <div class="device-inner">
+                        <div class="scan-line"></div>
+                    </div>
+                </div>
+            </div>
+            <h1>Device Verification</h1>
+            <div class="progress-bar">
+                <div class="progress"></div>
+            </div>
+            <div class="message" id="loadingMessage">Scanning your device...</div>
+            <div class="loading-dots">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Screen -->
+    <div class="screen success-screen">
+        <div class="container">
+            <div class="status-icon success-icon">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                </svg>
+            </div>
+            <h1>Device Verification</h1>
+            <div class="status-title" id="successTitle">Verification Successful</div>
+            <div class="status-message" id="successMessage">Your device has been verified successfully. You can now continue to use the bot.</div>
+            <button class="button" onclick="closeTelegramWebApp()">Continue to Bot</button>
+        </div>
+    </div>
+
+    <!-- Already Verified Screen -->
+    <div class="screen already-verified-screen">
+        <div class="container">
+            <div class="status-icon already-verified-icon">
+                <svg fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M10,17L6,13L7.41,11.59L10,14.17L16.59,7.58L18,9L10,17Z"/>
+                </svg>
+            </div>
+            <h1>Device Verification</h1>
+            <div class="status-title">You're Already Verified</div>
+            <div class="status-message">Your account is already verified. No additional verification is needed.</div>
+            <button class="button" onclick="closeTelegramWebApp()">Continue to Bot</button>
+        </div>
+    </div>
+
+    <!-- Error Screen -->
+    <div class="screen error-screen">
+        <div class="container">
+            <div class="status-icon error-icon">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </div>
+            <h1>Device Verification</h1>
+            <div class="status-title">Verification Failed</div>
+            <div class="status-message" id="errorMessage">The verification process encountered an error.</div>
+            <button class="button button-error" onclick="closeTelegramWebApp()">Continue to Bot</button>
+            <button class="button button-secondary" onclick="retryVerification()">Try Again</button>
+        </div>
+    </div>
+
+    <script>
+        // Configuration - Replace with your backend URL
+        const BACKEND_URL = 'https://your-backend-domain.com'; // Change this to your Pella.app backend URL
+        
+        let currentScreen = 'loading';
+        const loadingMessages = [
+            'Scanning your device...',
+            'Analyzing hardware fingerprint...',
+            'Validating security credentials...',
+            'Finalizing verification...'
+        ];
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Initialize Telegram Web App
+            if (window.Telegram?.WebApp) {
+                window.Telegram.WebApp.ready();
+                window.Telegram.WebApp.expand();
+                window.Telegram.WebApp.setHeaderColor('#1e3c72');
+                window.Telegram.WebApp.setBackgroundColor('#1e3c72');
+            }
+
+            // Start loading message rotation
+            let messageIndex = 0;
+            const messageInterval = setInterval(() => {
+                if (currentScreen === 'loading' && messageIndex < loadingMessages.length) {
+                    document.getElementById('loadingMessage').textContent = loadingMessages[messageIndex];
+                    messageIndex++;
+                } else {
+                    clearInterval(messageInterval);
+                }
+            }, 800);
+
+            // Start verification process
+            setTimeout(async () => {
+                await startVerification();
+            }, 2500);
+        });
+
+        async function startVerification() {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const bot = params.get("bot");
+                const botHash = params.get("botHash");
+                const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
+                const userId = user?.id?.toString();
+
+                if (!userId || !bot || !botHash) {
+                    throw new Error("Missing required verification parameters");
+                }
+
+                // Load FingerprintJS
+                const FingerprintJS = window.FingerprintJS;
+                if (!FingerprintJS) {
+                    throw new Error("FingerprintJS not loaded");
+                }
+
+                const fp = await FingerprintJS.load();
+                const result = await fp.get();
+
+                const verificationData = {
+                    user_id: userId,
+                    bot: bot,
+                    bot_hash: botHash,
+                    device_id: result.visitorId,
+                    user_agent: navigator.userAgent,
+                    platform: navigator.platform,
+                    language: navigator.language,
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    hardware_concurrency: navigator.hardwareConcurrency,
+                    device_memory: navigator.deviceMemory?.toString() || "unknown",
+                    screen_resolution: `${result.visitorId}x${screen.width}x${screen.height}`,
+                    timestamp: new Date().toISOString()
+                };
+
+                // Send verification request to backend
+                const response = await fetch(`${BACKEND_URL}/api/verify`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(verificationData)
+                });
+
+                const resultData = await response.json();
+
+                if (resultData.status === "continue" || (resultData.attempt !== null && resultData.attempt > 0)) {
+                    showScreen('already-verified');
+                } else if (resultData.status === "success") {
+                    showScreen('success');
+                } else {
+                    throw new Error(resultData.message || "Verification failed");
+                }
+
+            } catch (error) {
+                console.error('Verification error:', error);
+                document.getElementById('errorMessage').textContent = error.message || "An unexpected error occurred during verification.";
+                showScreen('error');
+            }
+        }
+
+        function showScreen(screenName) {
+            // Hide all screens
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+
+            // Show target screen
+            const targetScreen = document.querySelector(`.${screenName}-screen`);
+            if (targetScreen) {
+                targetScreen.classList.add('active');
+                currentScreen = screenName;
+            }
+        }
+
+        function closeTelegramWebApp() {
+            if (window.Telegram?.WebApp) {
+                window.Telegram.WebApp.close();
+            } else {
+                window.close();
+            }
+        }
+
+        function retryVerification() {
+            showScreen('loading');
+            document.getElementById('loadingMessage').textContent = loadingMessages[0];
+            setTimeout(async () => {
+                await startVerification();
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
